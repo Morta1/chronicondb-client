@@ -56,7 +56,7 @@ export function getLocaleSection(version: string, fileName: string, section: str
   const sectionData = rawSectionData.map((line) => {
     const [key, value] = line.split('=');
     return {
-      [key]: value.replace(/"/g, ''),
+      [key]: value?.replace(/"/g, ''),
     };
   });
 

@@ -6,7 +6,7 @@ import { Enchant } from '../../types/Enchant.types';
 import { Item, ItemSet, ItemType, ItemCategory } from '../../types/Item.types';
 import { Skill } from '../../types/Skill.types';
 import { ITEM_TYPES_BY_CATEGORIES } from '../data/dataMappings';
-import { readExtractFile, writeFile } from '../utils/fileUtils';
+import {getDirectories, readExtractFile, readExtractLocaleFile, writeFile} from '../utils/fileUtils';
 import {compare} from "compare-versions";
 
 interface Data {
@@ -32,7 +32,7 @@ export function generateSearchIndexes(version: string) {
   generateEnchantsSearchIndex(version, data);
   generateSkillsSearchIndex(version, data);
   if (compare(version, '1.40.1', '>=')) {
-    generateArtifactsSearchIndex(version, data);
+    generateArtifactsSearchIndex(version);
   }
 }
 
@@ -136,27 +136,28 @@ function generateSkillsSearchIndex(version: string, data: Data) {
   writeFile(index, version, 'skillsSearchIndex');
 }
 
-function generateArtifactsSearchIndex(version: string, data: Data) {
+function generateArtifactsSearchIndex(version: string) {
   const index: Record<string, string | number>[] = [];
+  const localesDirectories = getDirectories(version, 'sources/locale')
+  localesDirectories.forEach((locale: string) => {
+    const artifactsLocale = JSON.parse(readExtractLocaleFile(version, locale, 'artifacts')) as ArtifactInterface[];
+    artifactsLocale.forEach((artifacts) => {
+      const indexedArtifact: Record<string, string | number> = {
+        uuid: artifacts.uuid,
+        class: artifacts.class,
+        name: artifacts.name,
+        type: artifacts.type || '',
+        description: artifacts.description
+            .replace(/\+?PROC%?/g, '')
+            .replace(/\+?DAMAGE%?/g, '')
+            .replace(/\+?DURATION%?/g, '')
+            .replace(/\+?EFFECT%?/g, '')
+            .replace(/\+?VALUE%?/g, ''),
+      };
 
-  const { artifacts } = data;
+      index.push(indexedArtifact);
+    });
 
-  artifacts.forEach((artifacts) => {
-    const indexedArtifact: Record<string, string | number> = {
-      uuid: artifacts.uuid,
-      class: artifacts.class,
-      name: artifacts.name,
-      type: artifacts.type || '',
-      description: artifacts.description
-        .replace(/\+?PROC%?/g, '')
-        .replace(/\+?DAMAGE%?/g, '')
-        .replace(/\+?DURATION%?/g, '')
-        .replace(/\+?EFFECT%?/g, '')
-        .replace(/\+?VALUE%?/g, ''),
-    };
-
-    index.push(indexedArtifact);
-  });
-
-  writeFile(index, version, 'artifactsSearchIndex');
+    writeFile(index, version, `artifactsSearchIndex_${locale}`);
+  })
 }

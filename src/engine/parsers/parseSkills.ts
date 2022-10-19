@@ -2,46 +2,46 @@ import { compact, reduce, map, isEmpty } from 'lodash';
 
 import { CharacterClass } from '../../types/Character.types';
 import { Skill, SkillTree, SkillFamily, SkillType, DamageElement } from '../../types/Skill.types';
-import { readSourceFile, writeFile, assetExists } from '../utils/fileUtils';
+import {readSourceFile, writeFile, assetExists, getDirectories} from '../utils/fileUtils';
+import {getLocaleSection, parseLocaleData} from "./parseLocale";
 
 export function parseSkills(version: string, verbose = false) {
   // We remove the first line as it contains the version number
   const rawSkills = compact(readSourceFile(version, `skilldata_${version}.json`).split(/\n|\r/)).slice(1).join('\n');
   const skillsData = JSON.parse(rawSkills);
   const skills: Skill[] = [];
+  const localesDirectories = getDirectories(version, 'sources/locale');
+  localesDirectories.forEach((locale: string) => {
+    const localeData = parseLocale(version, locale);
 
-  // THIS IS HELL
-  const skillsByClass = reduce(skillsData, (result: Record<string, any>, skillTree, characterClass) => {
-    const parsedSkillTree = reduce(skillTree, (skillTreeResult: Record<string, any>, skillList, skillTreeName) => {
-      skillTreeResult[skillTreeName] = map(skillList, (skill) => {
-        const parsedSkill = parseSkill(skill, skillTreeName, characterClass);
-        skills.push(parsedSkill);
+    // THIS IS HELL
+    const skillsByClass = reduce(skillsData, (result: Record<string, any>, skillTree, characterClass) => {
+      const parsedSkillTree = reduce(skillTree, (skillTreeResult: Record<string, any>, skillList, skillTreeName) => {
+        skillTreeResult[skillTreeName] = map(skillList, (skill) => {
+          const parsedSkill = parseSkill(skill, skillTreeName, characterClass, localeData);
+          skills.push(parsedSkill);
 
-        if (verbose) {
-          console.log(parsedSkill);
-        }
+          if (verbose) {
+            console.log(parsedSkill);
+          }
 
-        return parsedSkill;
-      });
+          return parsedSkill;
+        });
 
-      return skillTreeResult;
+        return skillTreeResult;
+      }, {});
+
+      result[characterClass] = parsedSkillTree;
+
+      return result;
     }, {});
 
-    result[characterClass] = parsedSkillTree;
-
-    return result;
-  }, {});
-
-  writeFile(skills, version, 'skills');
-  writeFile(skillsByClass, version, 'skillsByClass');
-
-  return {
-    skills,
-    skillsByClass,
-  };
+    writeFile(skills, version, `skills_${locale}`);
+    writeFile(skillsByClass, version, `skillsByClass_${locale}`);
+  })
 }
 
-function parseSkill(skill: Record<string, string>, skillTree: string, characterClass: string): Skill {
+function parseSkill(skill: Record<string, string>, skillTree: string, characterClass: string, localeData: any): Skill {
   const { id, name, type, element, description } = skill;
   const parsedName = name.indexOf('_') == -1 ? name : name.split('_')[-1];
   const uuid = parseInt(id);
@@ -59,12 +59,13 @@ function parseSkill(skill: Record<string, string>, skillTree: string, characterC
   const proc = isEmpty(skill.proc) ? [] : skill.proc.split(',').map(str => parseFloat(str));
   const x = parseInt(skill.x);
   const y = parseInt(skill.y);
-  const description_next = isEmpty(skill.description_next) ? undefined : skill.description_next;
+  const descriptionLocale = localeData?.[uuid]?.txt1 ?? description;
+  const description_next = localeData?.[uuid]?.txt2 ?? skill.description_next;
   const cost = skill.cost1 ? parseInt(skill.cost1) : undefined;
   const cost100 = skill.cost100 ? parseInt(skill.cost100) : undefined;
   const tree = skillTree as SkillTree;
   const tags = skill.tags ? skill.tags.split(',').filter(str => !isEmpty(str)) : [];
-  let icon = null;
+  let icon;
 
   if (tree === SkillTree.Mastery) {
     const iconId = parseInt(id.replace(/^100/, ''));
@@ -87,7 +88,7 @@ function parseSkill(skill: Record<string, string>, skillTree: string, characterC
     maxRank,
     element: element as DamageElement,
     cooldown,
-    description,
+    description: descriptionLocale,
     description_next,
     cost,
     cost100,
@@ -103,4 +104,10 @@ function parseSkill(skill: Record<string, string>, skillTree: string, characterC
     proc,
     tags,
   };
+}
+
+function parseLocale(version: string, locale: string) {
+  const parser = /^skill_(\d+)_(\w+)$/;
+  const localeData = getLocaleSection(version, `locale/${locale}/skills`, 'skilldata');
+  return parseLocaleData(localeData, parser);
 }

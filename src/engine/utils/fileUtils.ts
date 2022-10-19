@@ -24,6 +24,11 @@ export function readExtractFile(version: string, fileName: string): string {
   return fs.readFileSync(absolutePath).toString();
 }
 
+export function readExtractLocaleFile(version: string, locale: string, fileName: string, ): string {
+  const absolutePath = path.resolve(__dirname, `../data/${version}/extracts/${fileName}_${locale}.json`);
+  return fs.readFileSync(absolutePath).toString();
+}
+
 export function writeFile(data: unknown, version: string, fileName: string): void {
   const absolutePath = path.resolve(__dirname, `../data/${version}/extracts/${fileName}.json`);
   fs.writeFileSync(absolutePath, JSON.stringify(data, null, 2));
@@ -35,4 +40,11 @@ export function getAssetPath(fileName: string): string {
 
 export function assetExists(fileName: string): boolean {
   return fs.existsSync(getAssetPath(fileName));
+}
+
+export function getDirectories(version: string, folderPath: string): string[] {
+  const absolutePath = path.resolve(__dirname, `../data/${version}/${folderPath}`);
+  return fs.readdirSync(absolutePath, { withFileTypes: true })
+          .filter(file => file.isDirectory())
+          .map(folder => folder.name)
 }

@@ -1,5 +1,4 @@
 import { compare } from 'compare-versions';
-
 import { CharacterClass } from 'types/Character.types';
 import { Enchant, EnchantsPool } from 'types/Enchant.types';
 import { Item, ItemSet } from 'types/Item.types';
